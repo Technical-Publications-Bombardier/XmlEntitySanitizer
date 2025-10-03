@@ -13,13 +13,13 @@ import java.util.regex.Pattern;
 
 public class XMLCharacterValidator {
 
-    public static String validCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~#`\t*';&@_\\,!=:\"<>/+- ?.{}()[]àâçéèêëîïôùûüÿñÀÂÄÇÉÈÊËÎÏÔÙÛÜŸÑ";
+    public static String validCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~#$`\t*';&@_\\,!=:\"<>/+- ?.{}()[]àâçéèêëîïôùûüÿñÀÂÄÇÉÈÊËÎÏÔÙÛÜŸÑ";
     private static String inXml;
     private static boolean verbose = false;
     private static String cirXml = null;
     private static String propertiesFile = "app.properties";
 
-    private static List<String> warningList = new ArrayList<>();
+    private static final List<String> warningList = new ArrayList<>();
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
@@ -78,13 +78,10 @@ public class XMLCharacterValidator {
         if (cirXml != null) {
             cirMap = buildMapping(cirXml);
         }
-        ;
+
         String outputFilePath = getDefaultOutputFileName(inputFilePath);
         String propertiesFilePath = propertiesFile;
-        boolean validateOnly = false;
-        if (args.length >= 2 && args[args.length - 1].equals("--v")) {
-            validateOnly = true;
-        }
+        boolean validateOnly = args.length >= 2 && args[args.length - 1].equals("--v");
         int i = 0;
         try {
             BufferedReader reader = new BufferedReader(new FileReader(inputFilePath));
@@ -100,7 +97,7 @@ public class XMLCharacterValidator {
                                 + "  Line content: " + line);
                     }
                 } else {
-                    sanitizeXML(line, xmlEntityMap, cirMap);
+                    sanitizeXML(line, xmlEntityMap, cirMap, i);
                 }
                 warningOnNotFounds(line);
 
@@ -140,7 +137,7 @@ public class XMLCharacterValidator {
         return xmlEntityMap;
     }
 
-    public static String sanitizeXML(String text, Map<Integer, String> xmlEntityMap, Map<String, String> cirMap) {
+    public static String sanitizeXML(String text, Map<Integer, String> xmlEntityMap, Map<String, String> cirMap, int lineNum) {
         StringBuilder sanitizedText = new StringBuilder();
         String cirConvertedLine = replaceAttribute(text, cirMap);
         for (int i = 0; i < cirConvertedLine.length(); i++) {
@@ -150,7 +147,7 @@ public class XMLCharacterValidator {
             } else if (xmlEntityMap.containsKey((int) c)) {
                 sanitizedText.append(xmlEntityMap.get((int) c));
             } else {
-                System.out.println("[Warning] Character not in pre-defined valid set: " + c + " #" + (int) c);
+                System.out.printf("[Warning] Character at line %d not in pre-defined valid set: %c # %d\n", lineNum, c, (int) c);
                 sanitizedText.append(c);
             }
         }
@@ -162,7 +159,7 @@ public class XMLCharacterValidator {
             char c = text.charAt(i);
             if (validCharacters.indexOf(c) == -1) {
                 if (validCharacters.indexOf(c) != -1) {
-                    ;
+
                 } else if (xmlEntityMap.containsKey((int) c)) {
                     System.out.println("Character not in pre-defined valid set :" + c + " #" + (int) c
                             + " to_be_replaced : " + xmlEntityMap.get((int) c));
@@ -188,13 +185,15 @@ public class XMLCharacterValidator {
 
     public static void saveSanitizedXML(String inputFilePath, String outputFilePath, Map<Integer, String> xmlEntityMap,
             Map<String, String> cirMap) {
+        int i = 0;
         try {
             BufferedReader reader = new BufferedReader(new FileReader(inputFilePath));
             BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputFilePath));
             String line;
 
             while ((line = reader.readLine()) != null) {
-                String sanitizedLine = sanitizeXML(line, xmlEntityMap, cirMap);
+                i++;
+                String sanitizedLine = sanitizeXML(line, xmlEntityMap, cirMap, i);
                 writer.write(sanitizedLine);
                 writer.newLine();
             }
@@ -233,7 +232,7 @@ public class XMLCharacterValidator {
     public static String replaceAttribute(String line, Map<String, String> map) {
         Pattern pattern = Pattern.compile("=\"(app[^\"]+)\"");
         Matcher matcher = pattern.matcher(line);
-        StringBuffer result = new StringBuffer();
+        StringBuilder result = new StringBuilder();
 
         while (matcher.find()) {
             String foundKey = matcher.group(1);
